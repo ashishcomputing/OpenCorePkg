@@ -94,6 +94,7 @@ GuiClipChildBounds (
   )
 {
   UINT32 PosChildOffset;
+  UINT32 NegChildOffset;
   UINT32 OffsetDelta;
   UINT32 NewOffset;
   UINT32 NewLength;
@@ -102,18 +103,16 @@ GuiClipChildBounds (
   ASSERT (ReqLength != NULL);
 
   if (ChildOffset >= 0) {
-    if (ChildLength == 0) {
-      return FALSE;
-    }
-
     PosChildOffset = (UINT32)ChildOffset;
+    NegChildOffset = 0;
   } else {
-    if ((INT64)ChildLength - (-ChildOffset) <= 0) {
+    if (ChildOffset + ChildLength <= 0) {
       return FALSE;
     }
 
     PosChildOffset = 0;
-    ChildLength    = (UINT32)(ChildLength - (-ChildOffset));
+    NegChildOffset = (UINT32) -ChildOffset;
+    ChildLength    = (UINT32)(ChildOffset + ChildLength);
   }
 
   ASSERT (ChildLength > 0);
@@ -125,7 +124,7 @@ GuiClipChildBounds (
     //
     // The requested offset starts within or past the child.
     //
-    OffsetDelta = (NewOffset - PosChildOffset);
+    OffsetDelta = NewOffset - PosChildOffset;
     if (ChildLength <= OffsetDelta) {
       //
       // The requested offset starts past the child.
@@ -136,11 +135,12 @@ GuiClipChildBounds (
     // The requested offset starts within the child.
     //
     NewOffset -= PosChildOffset;
+    NewOffset += NegChildOffset;
   } else {
     //
     // The requested offset ends within or before the child.
     //
-    OffsetDelta = (PosChildOffset - NewOffset);
+    OffsetDelta = PosChildOffset - NewOffset;
     if (NewLength <= OffsetDelta) {
       //
       // The requested offset ends before the child.
@@ -150,12 +150,8 @@ GuiClipChildBounds (
     //
     // The requested offset ends within the child.
     //
-    NewOffset  = 0;
+    NewOffset  = NegChildOffset;
     NewLength -= OffsetDelta;
-  }
-
-  if (ChildOffset < 0) {
-    NewOffset = (UINT32)(NewOffset + (-ChildOffset));
   }
 
   *ReqOffset = NewOffset;
@@ -192,13 +188,8 @@ GuiObjDrawDelegate (
   ASSERT (This->Height > OffsetY);
   ASSERT (DrawContext != NULL);
 
-  if (Width > This->Width - OffsetX) {
-    Width = This->Width - OffsetX;
-  }
-
-  if (Height > This->Height - OffsetY) {
-    Height = This->Height - OffsetY;
-  }
+  Width  = MIN (Width, This->Width - OffsetX);
+  Height = MIN (Height, This->Height - OffsetY);
 
   for (
     ChildEntry = GetPreviousNode (&This->Children, &This->Children);
@@ -561,7 +552,7 @@ GuiDrawToBuffer (
   //
   Width  = MIN (Width,  Image->Width  - OffsetX);
   Height = MIN (Height, Image->Height - OffsetY);
-  if ((Width | Height) == 0) {
+  if (Width == 0 || Height == 0) {
     return;
   }
 
